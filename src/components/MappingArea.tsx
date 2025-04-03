@@ -86,6 +86,10 @@ const MappingArea: React.FC = () => {
   // State for dropdown menu
   const [activeSourceForDropdown, setActiveSourceForDropdown] = useState<string | null>(null);
 
+  // State for helper text near inactive mapping dot
+  const [helperTextPosition, setHelperTextPosition] = useState<{x: number, y: number} | null>(null);
+  const [nearbyInactiveDot, setNearbyInactiveDot] = useState<string | null>(null);
+
   // Initialize default connections
   useEffect(() => {
     // Set default connections that should be active on load
@@ -123,6 +127,10 @@ const MappingArea: React.FC = () => {
         mouseX: e.clientX - containerRect.left,
         mouseY: e.clientY - containerRect.top,
       });
+
+      // Reset helper text when dragging starts
+      setHelperTextPosition(null);
+      setNearbyInactiveDot(null);
     }
   };
 
@@ -135,6 +143,50 @@ const MappingArea: React.FC = () => {
         mouseX: e.clientX - containerRect.left,
         mouseY: e.clientY - containerRect.top,
       });
+    } else if (containerRef.current) {
+      // Check for nearby inactive mapping dots when not dragging
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - containerRect.left;
+      const mouseY = e.clientY - containerRect.top;
+      
+      // Check source dots first
+      let foundNearbyDot = false;
+      for (const [id, element] of Object.entries(sourceDotsRef.current)) {
+        if (!element || connections.some(conn => conn.sourceId === id)) continue;
+        
+        const pos = getDotPosition(element);
+        const distance = Math.sqrt(Math.pow(mouseX - pos.x, 2) + Math.pow(mouseY - pos.y, 2));
+        
+        if (distance <= 20) { // Within 20px distance
+          setHelperTextPosition({ x: mouseX, y: mouseY });
+          setNearbyInactiveDot(id);
+          foundNearbyDot = true;
+          break;
+        }
+      }
+      
+      // If no nearby source dot found, check target dots
+      if (!foundNearbyDot) {
+        for (const [id, element] of Object.entries(targetDotsRef.current)) {
+          if (!element || connections.some(conn => conn.targetId === id)) continue;
+          
+          const pos = getDotPosition(element);
+          const distance = Math.sqrt(Math.pow(mouseX - pos.x, 2) + Math.pow(mouseY - pos.y, 2));
+          
+          if (distance <= 20) { // Within 20px distance
+            setHelperTextPosition({ x: mouseX, y: mouseY });
+            setNearbyInactiveDot(id);
+            foundNearbyDot = true;
+            break;
+          }
+        }
+      }
+      
+      // Clear helper text if no nearby inactive dot
+      if (!foundNearbyDot) {
+        setHelperTextPosition(null);
+        setNearbyInactiveDot(null);
+      }
     }
   };
 
@@ -233,13 +285,30 @@ const MappingArea: React.FC = () => {
     return targetFields.filter(field => !connectedTargetIds.includes(field.id));
   };
 
+  // Determine cursor style for a mapping dot
+  const getDotCursorStyle = (fieldId: string, isSource: boolean) => {
+    const hasConnection = isFieldActive(fieldId, isSource);
+    
+    if (hasConnection) {
+      return "cursor-pointer"; // Just pointer for connected dots
+    } else if (drawingConnection && drawingConnection.source === fieldId) {
+      return "cursor-grabbing"; // Grabbing cursor while dragging
+    } else {
+      return "cursor-grab"; // Grab cursor for unconnected dots
+    }
+  };
+
   return (
     <div 
       ref={containerRef}
       className="p-6 flex gap-6 relative"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={() => setDrawingConnection(null)}
+      onMouseLeave={() => {
+        setDrawingConnection(null);
+        setHelperTextPosition(null);
+        setNearbyInactiveDot(null);
+      }}
     >
       {/* Source Fields */}
       <div className="w-1/2 bg-white rounded-lg border overflow-hidden">
@@ -269,9 +338,9 @@ const MappingArea: React.FC = () => {
                     ref={el => (sourceDotsRef.current[field.id] = el)}
                     className={`w-4 h-4 rounded-full border-2 border-blue-500 ${
                       isFieldActive(field.id, true) 
-                        ? "bg-blue-500 cursor-pointer" 
-                        : "bg-white cursor-pointer"
-                    }`}
+                        ? "bg-blue-500" 
+                        : "bg-white"
+                    } ${getDotCursorStyle(field.id, true)}`}
                     onMouseDown={(e) => {
                       if (!isFieldActive(field.id, true)) {
                         handleDragStart(field.id, e);
@@ -347,7 +416,7 @@ const MappingArea: React.FC = () => {
                     isFieldActive(field.id, false)
                       ? "border-white bg-blue-500"
                       : "border-blue-500 bg-white"
-                  } mr-2 cursor-pointer`}
+                  } mr-2 ${getDotCursorStyle(field.id, false)}`}
                   onClick={() => handleDotClick(field.id, false)}
                 />
                 <div className="flex-1">{field.name}</div>
@@ -469,6 +538,21 @@ const MappingArea: React.FC = () => {
           />
         )}
       </svg>
+
+      {/* Helper text for nearby inactive mapping dot */}
+      {helperTextPosition && (
+        <div
+          className="absolute text-xs text-gray-500 pointer-events-none"
+          style={{
+            left: `${helperTextPosition.x}px`,
+            top: `${helperTextPosition.y + 20}px`,
+            transform: 'translateX(-50%)',
+            zIndex: 20,
+          }}
+        >
+          drag to connect
+        </div>
+      )}
 
       {/* Confirmation Dialog */}
       <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
