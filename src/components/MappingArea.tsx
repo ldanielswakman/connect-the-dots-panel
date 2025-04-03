@@ -1,6 +1,23 @@
+
 import React, { useState, useRef, useEffect } from "react";
-import { FileText, Plus, Trash2 } from "lucide-react";
+import { FileText, Plus, Trash2, ChevronDown } from "lucide-react";
 import ConnectionLine from "./ConnectionLine";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 
 // Types for our source and target fields
 interface Field {
@@ -62,6 +79,13 @@ const MappingArea: React.FC = () => {
   // State for the connection being hovered (to show the delete button)
   const [hoveredConnection, setHoveredConnection] = useState<string | null>(null);
   
+  // State for confirmation dialog
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [connectionToRemove, setConnectionToRemove] = useState<string | null>(null);
+  
+  // State for dropdown menu
+  const [activeSourceForDropdown, setActiveSourceForDropdown] = useState<string | null>(null);
+
   // Initialize default connections
   useEffect(() => {
     // Set default connections that should be active on load
@@ -155,10 +179,45 @@ const MappingArea: React.FC = () => {
     setDrawingConnection(null);
   };
 
+  // Handle dot click
+  const handleDotClick = (fieldId: string, isSource: boolean) => {
+    // If this dot already has a connection
+    const existingConnection = connections.find(conn => 
+      isSource ? conn.sourceId === fieldId : conn.targetId === fieldId
+    );
+
+    if (existingConnection) {
+      // Show the confirmation dialog
+      setConnectionToRemove(existingConnection.id);
+      setConfirmDialogOpen(true);
+    } else if (isSource) {
+      // Show dropdown for source dots without connections
+      setActiveSourceForDropdown(fieldId);
+    }
+  };
+
+  // Create connection from dropdown selection
+  const handleCreateConnectionFromDropdown = (sourceId: string, targetId: string) => {
+    // Check if target is already connected
+    if (!connections.some(conn => conn.targetId === targetId)) {
+      const newConnection: Connection = {
+        id: `conn-${Date.now()}`,
+        sourceId,
+        targetId,
+      };
+      
+      setConnections([...connections, newConnection]);
+    }
+    
+    setActiveSourceForDropdown(null);
+  };
+
   // Remove a connection
   const handleRemoveConnection = (connectionId: string) => {
     setConnections(connections.filter(conn => conn.id !== connectionId));
     setHoveredConnection(null);
+    setConnectionToRemove(null);
+    setConfirmDialogOpen(false);
   };
 
   // Check if a field is active (has a connection)
@@ -166,6 +225,12 @@ const MappingArea: React.FC = () => {
     return connections.some(conn => 
       isSource ? conn.sourceId === fieldId : conn.targetId === fieldId
     );
+  };
+
+  // Get available target fields (those that don't have connections yet)
+  const getAvailableTargetFields = () => {
+    const connectedTargetIds = connections.map(conn => conn.targetId);
+    return targetFields.filter(field => !connectedTargetIds.includes(field.id));
   };
 
   return (
@@ -199,19 +264,61 @@ const MappingArea: React.FC = () => {
               <div className="w-1/3 font-medium text-gray-700">{field.name}</div>
               <div className="w-2/3 text-gray-600 flex justify-between items-center">
                 <div className="truncate pr-4">{field.exampleContent}</div>
-                <div 
-                  ref={el => (sourceDotsRef.current[field.id] = el)}
-                  className={`w-4 h-4 rounded-full border-2 border-blue-500 ${
-                    isFieldActive(field.id, true) 
-                      ? "bg-blue-500" 
-                      : "bg-white cursor-pointer"
-                  }`}
-                  onMouseDown={(e) => {
-                    if (!isFieldActive(field.id, true)) {
-                      handleDragStart(field.id, e);
-                    }
-                  }}
-                />
+                <div className="relative">
+                  <div 
+                    ref={el => (sourceDotsRef.current[field.id] = el)}
+                    className={`w-4 h-4 rounded-full border-2 border-blue-500 ${
+                      isFieldActive(field.id, true) 
+                        ? "bg-blue-500 cursor-pointer" 
+                        : "bg-white cursor-pointer"
+                    }`}
+                    onMouseDown={(e) => {
+                      if (!isFieldActive(field.id, true)) {
+                        handleDragStart(field.id, e);
+                      }
+                    }}
+                    onClick={() => handleDotClick(field.id, true)}
+                  />
+                  
+                  {activeSourceForDropdown === field.id && (
+                    <DropdownMenu open={true} onOpenChange={(open) => {
+                      if (!open) setActiveSourceForDropdown(null);
+                    }}>
+                      <DropdownMenuTrigger asChild>
+                        <div />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent 
+                        className="w-48" 
+                        align="end" 
+                        side="right"
+                        style={{ 
+                          position: 'absolute', 
+                          top: '0', 
+                          right: '24px',
+                          zIndex: 20 
+                        }}
+                      >
+                        {getAvailableTargetFields().length === 0 ? (
+                          <div className="px-2 py-1 text-sm text-gray-500">
+                            No available targets
+                          </div>
+                        ) : (
+                          getAvailableTargetFields().map(targetField => (
+                            <DropdownMenuItem 
+                              key={targetField.id}
+                              onClick={() => handleCreateConnectionFromDropdown(field.id, targetField.id)}
+                            >
+                              {targetField.name}
+                              {targetField.required && (
+                                <span className="text-xs text-gray-500 ml-1">(required)</span>
+                              )}
+                            </DropdownMenuItem>
+                          ))
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -240,7 +347,8 @@ const MappingArea: React.FC = () => {
                     isFieldActive(field.id, false)
                       ? "border-white bg-blue-500"
                       : "border-blue-500 bg-white"
-                  } mr-2`}
+                  } mr-2 cursor-pointer`}
+                  onClick={() => handleDotClick(field.id, false)}
                 />
                 <div className="flex-1">{field.name}</div>
                 <div className={`text-xs ${isFieldActive(field.id, false) ? "text-blue-100" : "text-gray-500"}`}>
@@ -317,6 +425,7 @@ const MappingArea: React.FC = () => {
               className="connection-group"
               onMouseEnter={() => setHoveredConnection(connection.id)}
               onMouseLeave={() => setHoveredConnection(null)}
+              style={{ pointerEvents: 'auto' }}
             >
               <ConnectionLine 
                 startX={sourcePos.x}
@@ -360,6 +469,27 @@ const MappingArea: React.FC = () => {
           />
         )}
       </svg>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Connection?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this connection? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => connectionToRemove && handleRemoveConnection(connectionToRemove)}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

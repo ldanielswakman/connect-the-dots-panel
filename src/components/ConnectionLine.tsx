@@ -30,14 +30,26 @@ const ConnectionLine: React.FC<ConnectionLineProps> = ({
   `;
 
   return (
-    <path
-      d={pathData}
-      fill="none"
-      stroke={stroke}
-      strokeWidth={strokeWidth}
-      strokeDasharray={isDashed ? "5,5" : "none"}
-      className="connection-line"
-    />
+    <>
+      {/* Invisible wider path for better hover detection */}
+      <path
+        d={pathData}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={strokeWidth + 16} // 8px offset on each side
+        className="connection-line-hitarea"
+      />
+      
+      {/* Visible path */}
+      <path
+        d={pathData}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeDasharray={isDashed ? "5,5" : "none"}
+        className="connection-line"
+      />
+    </>
   );
 };
 
