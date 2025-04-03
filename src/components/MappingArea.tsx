@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { FileText, Plus, Trash2, ChevronDown } from "lucide-react";
 import ConnectionLine from "./ConnectionLine";
@@ -19,7 +18,6 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 
-// Types for our source and target fields
 interface Field {
   id: string;
   name: string;
@@ -28,7 +26,6 @@ interface Field {
   active?: boolean;
 }
 
-// Type for the mapping connection
 interface Connection {
   id: string;
   sourceId: string;
@@ -36,7 +33,6 @@ interface Connection {
 }
 
 const MappingArea: React.FC = () => {
-  // Define source fields (left side)
   const sourceFields: Field[] = [
     { id: "sku-id", name: "SKU ID", exampleContent: "1, 2, 3, 4, 5" },
     { id: "image-url", name: "Image URL", exampleContent: "https://store.storeimages.cdn-a..." },
@@ -49,7 +45,6 @@ const MappingArea: React.FC = () => {
     { id: "display-size", name: "Display Size", exampleContent: "Color" },
   ];
 
-  // Define target fields (right side)
   const targetFields: Field[] = [
     { id: "id", name: "ID", required: true },
     { id: "product-name", name: "Product Name", required: true },
@@ -59,40 +54,24 @@ const MappingArea: React.FC = () => {
     { id: "price", name: "Price" },
   ];
 
-  // State for connections between fields
   const [connections, setConnections] = useState<Connection[]>([]);
-  
-  // State for the currently drawing connection
   const [drawingConnection, setDrawingConnection] = useState<{
     source: string;
     mouseX: number;
     mouseY: number;
   } | null>(null);
-
-  // Refs for the dot elements (to get their positions)
   const sourceDotsRef = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const targetDotsRef = useRef<{ [key: string]: HTMLDivElement | null }>({});
-  
-  // Ref for the container element (to calculate relative positions)
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // State for the connection being hovered (to show the delete button)
   const [hoveredConnection, setHoveredConnection] = useState<string | null>(null);
-  
-  // State for confirmation dialog
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [connectionToRemove, setConnectionToRemove] = useState<string | null>(null);
-  
-  // State for dropdown menu
   const [activeSourceForDropdown, setActiveSourceForDropdown] = useState<string | null>(null);
-
-  // State for helper text near inactive mapping dot
   const [helperTextPosition, setHelperTextPosition] = useState<{x: number, y: number} | null>(null);
   const [nearbyInactiveDot, setNearbyInactiveDot] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  // Initialize default connections
   useEffect(() => {
-    // Set default connections that should be active on load
     setConnections([
       { id: "conn-1", sourceId: "sku-id", targetId: "id" },
       { id: "conn-2", sourceId: "title", targetId: "product-name" },
@@ -100,7 +79,6 @@ const MappingArea: React.FC = () => {
     ]);
   }, []);
 
-  // Get the center position of a dot element
   const getDotPosition = (element: HTMLDivElement | null) => {
     if (!element || !containerRef.current) return { x: 0, y: 0 };
     
@@ -113,9 +91,7 @@ const MappingArea: React.FC = () => {
     };
   };
 
-  // Start drawing a connection
   const handleDragStart = (sourceId: string, e: React.MouseEvent) => {
-    // Only allow one connection per dot
     if (connections.some(conn => conn.sourceId === sourceId)) {
       return;
     }
@@ -128,13 +104,17 @@ const MappingArea: React.FC = () => {
         mouseY: e.clientY - containerRect.top,
       });
 
-      // Reset helper text when dragging starts
+      setIsDragging(true);
+      document.body.style.userSelect = 'none';
+      document.body.style.WebkitUserSelect = 'none';
+      document.body.style.MozUserSelect = 'none';
+      document.body.style.msUserSelect = 'none';
+
       setHelperTextPosition(null);
       setNearbyInactiveDot(null);
     }
   };
 
-  // Update the drawing connection as mouse moves
   const handleMouseMove = (e: React.MouseEvent) => {
     if (drawingConnection && containerRef.current) {
       const containerRect = containerRef.current.getBoundingClientRect();
@@ -144,12 +124,10 @@ const MappingArea: React.FC = () => {
         mouseY: e.clientY - containerRect.top,
       });
     } else if (containerRef.current) {
-      // Check for nearby inactive mapping dots when not dragging
       const containerRect = containerRef.current.getBoundingClientRect();
       const mouseX = e.clientX - containerRect.left;
       const mouseY = e.clientY - containerRect.top;
       
-      // Check source dots first
       let foundNearbyDot = false;
       for (const [id, element] of Object.entries(sourceDotsRef.current)) {
         if (!element || connections.some(conn => conn.sourceId === id)) continue;
@@ -157,7 +135,7 @@ const MappingArea: React.FC = () => {
         const pos = getDotPosition(element);
         const distance = Math.sqrt(Math.pow(mouseX - pos.x, 2) + Math.pow(mouseY - pos.y, 2));
         
-        if (distance <= 20) { // Within 20px distance
+        if (distance <= 20) {
           setHelperTextPosition({ x: mouseX, y: mouseY });
           setNearbyInactiveDot(id);
           foundNearbyDot = true;
@@ -165,7 +143,6 @@ const MappingArea: React.FC = () => {
         }
       }
       
-      // If no nearby source dot found, check target dots
       if (!foundNearbyDot) {
         for (const [id, element] of Object.entries(targetDotsRef.current)) {
           if (!element || connections.some(conn => conn.targetId === id)) continue;
@@ -173,7 +150,7 @@ const MappingArea: React.FC = () => {
           const pos = getDotPosition(element);
           const distance = Math.sqrt(Math.pow(mouseX - pos.x, 2) + Math.pow(mouseY - pos.y, 2));
           
-          if (distance <= 20) { // Within 20px distance
+          if (distance <= 20) {
             setHelperTextPosition({ x: mouseX, y: mouseY });
             setNearbyInactiveDot(id);
             foundNearbyDot = true;
@@ -182,7 +159,6 @@ const MappingArea: React.FC = () => {
         }
       }
       
-      // Clear helper text if no nearby inactive dot
       if (!foundNearbyDot) {
         setHelperTextPosition(null);
         setNearbyInactiveDot(null);
@@ -190,11 +166,9 @@ const MappingArea: React.FC = () => {
     }
   };
 
-  // Finish drawing a connection
   const handleMouseUp = (e: React.MouseEvent) => {
     if (!drawingConnection) return;
     
-    // Find if we're over a target dot
     let targetElement: HTMLDivElement | null = null;
     let targetId: string | null = null;
     
@@ -215,9 +189,7 @@ const MappingArea: React.FC = () => {
       }
     }
     
-    // If we found a target and it's not already connected
     if (targetId && !connections.some(conn => conn.targetId === targetId)) {
-      // Create a new connection
       const newConnection: Connection = {
         id: `conn-${Date.now()}`,
         sourceId: drawingConnection.source,
@@ -227,30 +199,37 @@ const MappingArea: React.FC = () => {
       setConnections([...connections, newConnection]);
     }
     
-    // Reset drawing state
     setDrawingConnection(null);
   };
 
-  // Handle dot click
+  const handleMouseLeave = () => {
+    setDrawingConnection(null);
+    setHelperTextPosition(null);
+    setNearbyInactiveDot(null);
+    
+    if (isDragging) {
+      setIsDragging(false);
+      document.body.style.userSelect = '';
+      document.body.style.WebkitUserSelect = '';
+      document.body.style.MozUserSelect = '';
+      document.body.style.msUserSelect = '';
+    }
+  };
+
   const handleDotClick = (fieldId: string, isSource: boolean) => {
-    // If this dot already has a connection
     const existingConnection = connections.find(conn => 
       isSource ? conn.sourceId === fieldId : conn.targetId === fieldId
     );
 
     if (existingConnection) {
-      // Show the confirmation dialog
       setConnectionToRemove(existingConnection.id);
       setConfirmDialogOpen(true);
     } else if (isSource) {
-      // Show dropdown for source dots without connections
       setActiveSourceForDropdown(fieldId);
     }
   };
 
-  // Create connection from dropdown selection
   const handleCreateConnectionFromDropdown = (sourceId: string, targetId: string) => {
-    // Check if target is already connected
     if (!connections.some(conn => conn.targetId === targetId)) {
       const newConnection: Connection = {
         id: `conn-${Date.now()}`,
@@ -264,7 +243,6 @@ const MappingArea: React.FC = () => {
     setActiveSourceForDropdown(null);
   };
 
-  // Remove a connection
   const handleRemoveConnection = (connectionId: string) => {
     setConnections(connections.filter(conn => conn.id !== connectionId));
     setHoveredConnection(null);
@@ -272,29 +250,26 @@ const MappingArea: React.FC = () => {
     setConfirmDialogOpen(false);
   };
 
-  // Check if a field is active (has a connection)
   const isFieldActive = (fieldId: string, isSource: boolean) => {
     return connections.some(conn => 
       isSource ? conn.sourceId === fieldId : conn.targetId === fieldId
     );
   };
 
-  // Get available target fields (those that don't have connections yet)
   const getAvailableTargetFields = () => {
     const connectedTargetIds = connections.map(conn => conn.targetId);
     return targetFields.filter(field => !connectedTargetIds.includes(field.id));
   };
 
-  // Determine cursor style for a mapping dot
   const getDotCursorStyle = (fieldId: string, isSource: boolean) => {
     const hasConnection = isFieldActive(fieldId, isSource);
     
     if (hasConnection) {
-      return "cursor-pointer"; // Just pointer for connected dots
+      return "cursor-pointer";
     } else if (drawingConnection && drawingConnection.source === fieldId) {
-      return "cursor-grabbing"; // Grabbing cursor while dragging
+      return "cursor-grabbing";
     } else {
-      return "cursor-grab"; // Grab cursor for unconnected dots
+      return "cursor-grab";
     }
   };
 
@@ -304,13 +279,8 @@ const MappingArea: React.FC = () => {
       className="p-6 flex gap-6 relative"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={() => {
-        setDrawingConnection(null);
-        setHelperTextPosition(null);
-        setNearbyInactiveDot(null);
-      }}
+      onMouseLeave={handleMouseLeave}
     >
-      {/* Source Fields */}
       <div className="w-1/2 bg-white rounded-lg border overflow-hidden">
         <div className="p-4 border-b flex items-center gap-3">
           <FileText className="text-blue-500 w-6 h-6" />
@@ -321,13 +291,11 @@ const MappingArea: React.FC = () => {
         </div>
         
         <div className="divide-y">
-          {/* Header row */}
           <div className="flex px-4 py-3 bg-gray-50 text-gray-600 font-medium">
             <div className="w-1/3">Column name</div>
             <div className="w-2/3">Example content</div>
           </div>
           
-          {/* Data rows */}
           {sourceFields.map(field => (
             <div key={field.id} className="flex px-4 py-3 items-center">
               <div className="w-1/3 font-medium text-gray-700">{field.name}</div>
@@ -394,7 +362,6 @@ const MappingArea: React.FC = () => {
         </div>
       </div>
       
-      {/* Target Fields */}
       <div className="w-1/2 space-y-6">
         <div className="bg-white rounded-lg border p-4">
           <h3 className="font-medium text-gray-800 mb-1">Poltio Product Data</h3>
@@ -426,7 +393,6 @@ const MappingArea: React.FC = () => {
               </div>
             ))}
             
-            {/* Add new attribute button */}
             <button className="flex items-center justify-center w-full border border-dashed border-gray-300 rounded-full p-2 text-gray-500 hover:bg-gray-50">
               <Plus className="w-4 h-4 mr-2" />
               Add new attribute
@@ -434,7 +400,6 @@ const MappingArea: React.FC = () => {
           </div>
         </div>
         
-        {/* Preview panel */}
         <div className="bg-white rounded-lg border p-4">
           <div className="flex justify-between items-start">
             <div className="flex-1">
@@ -474,12 +439,10 @@ const MappingArea: React.FC = () => {
         </div>
       </div>
       
-      {/* Connection Lines */}
       <svg 
         className="absolute top-0 left-0 w-full h-full pointer-events-none" 
         style={{ zIndex: 10 }}
       >
-        {/* Existing connections */}
         {connections.map(connection => {
           const sourceElement = sourceDotsRef.current[connection.sourceId];
           const targetElement = targetDotsRef.current[connection.targetId];
@@ -525,7 +488,6 @@ const MappingArea: React.FC = () => {
           );
         })}
         
-        {/* Drawing connection line */}
         {drawingConnection && (
           <ConnectionLine 
             startX={getDotPosition(sourceDotsRef.current[drawingConnection.source]).x}
@@ -539,7 +501,6 @@ const MappingArea: React.FC = () => {
         )}
       </svg>
 
-      {/* Helper text for nearby inactive mapping dot */}
       {helperTextPosition && (
         <div
           className="absolute text-xs text-gray-500 pointer-events-none"
@@ -554,7 +515,6 @@ const MappingArea: React.FC = () => {
         </div>
       )}
 
-      {/* Confirmation Dialog */}
       <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
