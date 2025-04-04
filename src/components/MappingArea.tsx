@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { FileText, Plus, Trash2, ChevronDown } from "lucide-react";
 import ConnectionLine from "./ConnectionLine";
@@ -30,6 +31,10 @@ interface Connection {
   id: string;
   sourceId: string;
   targetId: string;
+}
+
+interface ConnectedFields {
+  [key: string]: boolean;
 }
 
 const MappingArea: React.FC = () => {
@@ -70,13 +75,25 @@ const MappingArea: React.FC = () => {
   const [helperTextPosition, setHelperTextPosition] = useState<{x: number, y: number} | null>(null);
   const [nearbyInactiveDot, setNearbyInactiveDot] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [connectedFields, setConnectedFields] = useState<ConnectedFields>({});
 
   useEffect(() => {
-    setConnections([
+    // Initialize with default connections
+    const initialConnections = [
       { id: "conn-1", sourceId: "sku-id", targetId: "id" },
       { id: "conn-2", sourceId: "title", targetId: "product-name" },
       { id: "conn-3", sourceId: "url", targetId: "product-url" },
-    ]);
+    ];
+    
+    setConnections(initialConnections);
+    
+    // Initialize connected fields state
+    const initialFieldsState: ConnectedFields = {};
+    initialConnections.forEach(conn => {
+      initialFieldsState[conn.targetId] = true;
+    });
+    
+    setConnectedFields(initialFieldsState);
   }, []);
 
   const getDotPosition = (element: HTMLDivElement | null) => {
@@ -106,10 +123,9 @@ const MappingArea: React.FC = () => {
 
       setIsDragging(true);
       document.body.style.userSelect = 'none';
-      document.body.style.WebkitUserSelect = 'none';
-      document.body.style.MozUserSelect = 'none';
-      document.body.style.msUserSelect = 'none';
-
+      document.body.style.webkitUserSelect = 'none'; // Fixed property name
+      document.body.style.msUserSelect = 'none'; // Fixed property name
+      
       setHelperTextPosition(null);
       setNearbyInactiveDot(null);
     }
@@ -197,9 +213,23 @@ const MappingArea: React.FC = () => {
       };
       
       setConnections([...connections, newConnection]);
+      
+      // Update connected fields state
+      setConnectedFields(prev => ({
+        ...prev,
+        [targetId]: true
+      }));
     }
     
     setDrawingConnection(null);
+    
+    // Re-enable text selection
+    if (isDragging) {
+      setIsDragging(false);
+      document.body.style.userSelect = '';
+      document.body.style.webkitUserSelect = ''; // Fixed property name
+      document.body.style.msUserSelect = ''; // Fixed property name
+    }
   };
 
   const handleMouseLeave = () => {
@@ -210,9 +240,8 @@ const MappingArea: React.FC = () => {
     if (isDragging) {
       setIsDragging(false);
       document.body.style.userSelect = '';
-      document.body.style.WebkitUserSelect = '';
-      document.body.style.MozUserSelect = '';
-      document.body.style.msUserSelect = '';
+      document.body.style.webkitUserSelect = ''; // Fixed property name
+      document.body.style.msUserSelect = ''; // Fixed property name
     }
   };
 
@@ -238,12 +267,28 @@ const MappingArea: React.FC = () => {
       };
       
       setConnections([...connections, newConnection]);
+      
+      // Update connected fields state
+      setConnectedFields(prev => ({
+        ...prev,
+        [targetId]: true
+      }));
     }
     
     setActiveSourceForDropdown(null);
   };
 
   const handleRemoveConnection = (connectionId: string) => {
+    const connectionToRemove = connections.find(conn => conn.id === connectionId);
+    
+    if (connectionToRemove) {
+      // Update connected fields state
+      setConnectedFields(prev => ({
+        ...prev,
+        [connectionToRemove.targetId]: false
+      }));
+    }
+    
     setConnections(connections.filter(conn => conn.id !== connectionId));
     setHoveredConnection(null);
     setConnectionToRemove(null);
@@ -275,6 +320,18 @@ const MappingArea: React.FC = () => {
 
   const isTargetFieldConnected = (fieldId: string) => {
     return connections.some(conn => conn.targetId === fieldId);
+  };
+
+  const getFieldAnimationClass = (fieldId: string) => {
+    const isConnected = connectedFields[fieldId];
+    
+    if (isConnected === undefined) {
+      return "";
+    } else if (isConnected) {
+      return "animate-connection-added";
+    } else {
+      return "animate-connection-removed";
+    }
   };
 
   return (
@@ -407,15 +464,33 @@ const MappingArea: React.FC = () => {
       
       <div className="w-[30%] space-y-6">
         <div className="bg-white rounded-lg border p-4">
-          <div className="flex justify-between items-start">
-            <div className="flex-1">
-              <div className="flex items-center">
-                <div className="h-1 w-10 bg-blue-500 rounded-full mr-2"></div>
-                <span className="text-sm text-blue-500">89% MATCH</span>
-                <span className="text-xs text-gray-500 ml-auto">More info</span>
+          <div className="flex flex-col">
+            <div className="flex items-center">
+              <div className="h-1 w-10 bg-blue-500 rounded-full mr-2"></div>
+              <span className="text-sm text-blue-500">89% MATCH</span>
+              <span className="text-xs text-gray-500 ml-auto">More info</span>
+            </div>
+            
+            {/* Image above content, with 16:10 aspect ratio */}
+            <div className="w-full mt-2 mb-4">
+              <div className={`w-full aspect-[16/10] ${getFieldAnimationClass("image")}`}>
+                {isTargetFieldConnected("image") ? (
+                  <img 
+                    src="/lovable-uploads/28f3486c-d672-4d5f-aad6-bbb221854306.png" 
+                    alt="iPhone 15 Pro" 
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400 text-xs">
+                    [Image]
+                  </div>
+                )}
               </div>
-              
-              <h3 className="font-medium text-gray-800 mt-2">
+            </div>
+            
+            {/* Product content below image */}
+            <div>
+              <h3 className={`font-medium text-gray-800 ${getFieldAnimationClass("product-name")}`}>
                 {isTargetFieldConnected("product-name") ? (
                   "iPhone 15 Pro - Black"
                 ) : (
@@ -423,7 +498,7 @@ const MappingArea: React.FC = () => {
                 )}
               </h3>
               
-              <p className="text-sm text-gray-600 mt-1">
+              <p className={`text-sm text-gray-600 mt-1 ${getFieldAnimationClass("description")}`}>
                 {isTargetFieldConnected("description") ? (
                   <>
                     General features<br />
@@ -435,30 +510,16 @@ const MappingArea: React.FC = () => {
                 )}
               </p>
               
-              <div className={isTargetFieldConnected("price") ? "text-blue-500 font-medium mt-3" : "text-gray-400 mt-3"}>
+              <div className={`mt-3 ${getFieldAnimationClass("price")} ${isTargetFieldConnected("price") ? "text-blue-500 font-medium" : "text-gray-400"}`}>
                 {isTargetFieldConnected("price") ? "€999.00" : "[Price]"}
               </div>
               
               <button 
-                className={`mt-3 ${isTargetFieldConnected("product-url") ? "text-blue-500 hover:text-blue-600" : "text-gray-400"}`}
+                className={`mt-3 ${getFieldAnimationClass("product-url")} ${isTargetFieldConnected("product-url") ? "text-blue-500 hover:text-blue-600" : "text-gray-400"}`}
                 disabled={!isTargetFieldConnected("product-url")}
               >
                 See product
               </button>
-            </div>
-            
-            <div className="ml-4">
-              {isTargetFieldConnected("image") ? (
-                <img 
-                  src="/lovable-uploads/28f3486c-d672-4d5f-aad6-bbb221854306.png" 
-                  alt="iPhone 15 Pro" 
-                  className="w-24 h-24 object-contain"
-                />
-              ) : (
-                <div className="w-24 h-24 bg-gray-200 flex items-center justify-center text-gray-400 text-xs">
-                  [Image]
-                </div>
-              )}
             </div>
           </div>
           

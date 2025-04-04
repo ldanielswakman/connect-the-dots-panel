@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -84,11 +85,23 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'connection-added': {
+					'0%': { transform: 'scale(1)' },
+					'50%': { transform: 'scale(1.1)' },
+					'100%': { transform: 'scale(1)' }
+				},
+				'connection-removed': {
+					'0%': { transform: 'scale(1)' },
+					'50%': { transform: 'scale(0.9)' },
+					'100%': { transform: 'scale(1)' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'connection-added': 'connection-added 0.3s ease-in-out',
+				'connection-removed': 'connection-removed 0.3s ease-in-out'
 			}
 		}
 	},
