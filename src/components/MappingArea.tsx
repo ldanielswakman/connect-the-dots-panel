@@ -273,6 +273,10 @@ const MappingArea: React.FC = () => {
     }
   };
 
+  const isTargetFieldConnected = (fieldId: string) => {
+    return connections.some(conn => conn.targetId === fieldId);
+  };
+
   return (
     <div 
       ref={containerRef}
@@ -281,7 +285,7 @@ const MappingArea: React.FC = () => {
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseLeave}
     >
-      <div className="w-1/2 bg-white rounded-lg border overflow-hidden">
+      <div className="w-[40%] bg-white rounded-lg border overflow-hidden">
         <div className="p-4 border-b flex items-center gap-3">
           <FileText className="text-blue-500 w-6 h-6" />
           <div>
@@ -362,7 +366,7 @@ const MappingArea: React.FC = () => {
         </div>
       </div>
       
-      <div className="w-1/2 space-y-6">
+      <div className="w-[30%] space-y-6">
         <div className="bg-white rounded-lg border p-4">
           <h3 className="font-medium text-gray-800 mb-1">Poltio Product Data</h3>
           <p className="text-sm text-gray-500">These fields and attributes can be used inside Poltio's widgets</p>
@@ -399,7 +403,9 @@ const MappingArea: React.FC = () => {
             </button>
           </div>
         </div>
-        
+      </div>
+      
+      <div className="w-[30%] space-y-6">
         <div className="bg-white rounded-lg border p-4">
           <div className="flex justify-between items-start">
             <div className="flex-1">
@@ -409,27 +415,50 @@ const MappingArea: React.FC = () => {
                 <span className="text-xs text-gray-500 ml-auto">More info</span>
               </div>
               
-              <h3 className="font-medium text-gray-800 mt-2">iPhone 15 Pro - Black</h3>
+              <h3 className="font-medium text-gray-800 mt-2">
+                {isTargetFieldConnected("product-name") ? (
+                  "iPhone 15 Pro - Black"
+                ) : (
+                  <span className="text-gray-400">[Product Name]</span>
+                )}
+              </h3>
+              
               <p className="text-sm text-gray-600 mt-1">
-                General features<br />
-                A17 Pro chip with 6-core GPU<br />
-                Up to 29 hours video playback<br />
-                {/* More text truncated for brevity */}
+                {isTargetFieldConnected("description") ? (
+                  <>
+                    General features<br />
+                    A17 Pro chip with 6-core GPU<br />
+                    Up to 29 hours video playback
+                  </>
+                ) : (
+                  <span className="text-gray-400">[Description]</span>
+                )}
               </p>
               
-              <div className="text-blue-500 font-medium mt-3">€999.00</div>
+              <div className={isTargetFieldConnected("price") ? "text-blue-500 font-medium mt-3" : "text-gray-400 mt-3"}>
+                {isTargetFieldConnected("price") ? "€999.00" : "[Price]"}
+              </div>
               
-              <button className="mt-3 text-gray-400 hover:text-gray-600">
+              <button 
+                className={`mt-3 ${isTargetFieldConnected("product-url") ? "text-blue-500 hover:text-blue-600" : "text-gray-400"}`}
+                disabled={!isTargetFieldConnected("product-url")}
+              >
                 See product
               </button>
             </div>
             
             <div className="ml-4">
-              <img 
-                src="/lovable-uploads/28f3486c-d672-4d5f-aad6-bbb221854306.png" 
-                alt="iPhone 15 Pro" 
-                className="w-24 h-24 object-contain"
-              />
+              {isTargetFieldConnected("image") ? (
+                <img 
+                  src="/lovable-uploads/28f3486c-d672-4d5f-aad6-bbb221854306.png" 
+                  alt="iPhone 15 Pro" 
+                  className="w-24 h-24 object-contain"
+                />
+              ) : (
+                <div className="w-24 h-24 bg-gray-200 flex items-center justify-center text-gray-400 text-xs">
+                  [Image]
+                </div>
+              )}
             </div>
           </div>
           
