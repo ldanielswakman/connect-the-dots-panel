@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { FileText, Plus, Trash2, ChevronDown } from "lucide-react";
 import ConnectionLine from "./ConnectionLine";
@@ -67,6 +66,7 @@ const MappingArea: React.FC = () => {
   } | null>(null);
   const sourceDotsRef = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const targetDotsRef = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const targetFieldRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoveredConnection, setHoveredConnection] = useState<string | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -76,6 +76,7 @@ const MappingArea: React.FC = () => {
   const [nearbyInactiveDot, setNearbyInactiveDot] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [connectedFields, setConnectedFields] = useState<ConnectedFields>({});
+  const [hoveredTargetField, setHoveredTargetField] = useState<string | null>(null);
 
   useEffect(() => {
     // Initialize with default connections
@@ -123,8 +124,7 @@ const MappingArea: React.FC = () => {
 
       setIsDragging(true);
       document.body.style.userSelect = 'none';
-      document.body.style.webkitUserSelect = 'none'; // Fixed property name
-      document.body.style.msUserSelect = 'none'; // Fixed property name
+      document.body.style.webkitUserSelect = 'none';
       
       setHelperTextPosition(null);
       setNearbyInactiveDot(null);
@@ -139,6 +139,30 @@ const MappingArea: React.FC = () => {
         mouseX: e.clientX - containerRect.left,
         mouseY: e.clientY - containerRect.top,
       });
+      
+      // Check if we're hovering over any target field
+      let foundHoveredField = false;
+      
+      for (const [id, element] of Object.entries(targetFieldRefs.current)) {
+        if (!element || connections.some(conn => conn.targetId === id)) continue;
+        
+        const rect = element.getBoundingClientRect();
+        const isOver =
+          e.clientX >= rect.left &&
+          e.clientX <= rect.right &&
+          e.clientY >= rect.top &&
+          e.clientY >= rect.bottom;
+        
+        if (isOver) {
+          setHoveredTargetField(id);
+          foundHoveredField = true;
+          break;
+        }
+      }
+      
+      if (!foundHoveredField) {
+        setHoveredTargetField(null);
+      }
     } else if (containerRef.current) {
       const containerRect = containerRef.current.getBoundingClientRect();
       const mouseX = e.clientX - containerRect.left;
@@ -185,23 +209,27 @@ const MappingArea: React.FC = () => {
   const handleMouseUp = (e: React.MouseEvent) => {
     if (!drawingConnection) return;
     
-    let targetElement: HTMLDivElement | null = null;
     let targetId: string | null = null;
     
-    for (const [id, element] of Object.entries(targetDotsRef.current)) {
-      if (!element) continue;
-      
-      const rect = element.getBoundingClientRect();
-      const isOver =
-        e.clientX >= rect.left &&
-        e.clientX <= rect.right &&
-        e.clientY >= rect.top &&
-        e.clientY <= rect.bottom;
-      
-      if (isOver) {
-        targetElement = element;
-        targetId = id;
-        break;
+    // First check if we're over a target field
+    if (hoveredTargetField) {
+      targetId = hoveredTargetField;
+    } else {
+      // Fall back to checking if we're over a target dot
+      for (const [id, element] of Object.entries(targetDotsRef.current)) {
+        if (!element) continue;
+        
+        const rect = element.getBoundingClientRect();
+        const isOver =
+          e.clientX >= rect.left &&
+          e.clientX <= rect.right &&
+          e.clientY >= rect.top &&
+          e.clientY <= rect.bottom;
+        
+        if (isOver) {
+          targetId = id;
+          break;
+        }
       }
     }
     
@@ -222,13 +250,13 @@ const MappingArea: React.FC = () => {
     }
     
     setDrawingConnection(null);
+    setHoveredTargetField(null);
     
     // Re-enable text selection
     if (isDragging) {
       setIsDragging(false);
       document.body.style.userSelect = '';
-      document.body.style.webkitUserSelect = ''; // Fixed property name
-      document.body.style.msUserSelect = ''; // Fixed property name
+      document.body.style.webkitUserSelect = '';
     }
   };
 
@@ -236,12 +264,12 @@ const MappingArea: React.FC = () => {
     setDrawingConnection(null);
     setHelperTextPosition(null);
     setNearbyInactiveDot(null);
+    setHoveredTargetField(null);
     
     if (isDragging) {
       setIsDragging(false);
       document.body.style.userSelect = '';
-      document.body.style.webkitUserSelect = ''; // Fixed property name
-      document.body.style.msUserSelect = ''; // Fixed property name
+      document.body.style.webkitUserSelect = '';
     }
   };
 
@@ -432,11 +460,14 @@ const MappingArea: React.FC = () => {
             {targetFields.map(field => (
               <div 
                 key={field.id}
+                ref={el => (targetFieldRefs.current[field.id] = el)}
                 className={`flex items-center rounded-full border px-2 py-2 ${
                   isFieldActive(field.id, false)
                     ? "bg-blue-500 text-white border-blue-500"
+                    : hoveredTargetField === field.id
+                    ? "bg-gray-100 text-gray-800 border-gray-200"
                     : "bg-white text-gray-800 border-gray-200"
-                }`}
+                } transition-colors`}
               >
                 <div 
                   ref={el => (targetDotsRef.current[field.id] = el)}
@@ -465,18 +496,12 @@ const MappingArea: React.FC = () => {
       <div className="w-[30%] space-y-6">
         <div className="bg-white rounded-lg border p-4">
           <div className="flex flex-col">
-            <div className="flex items-center">
-              <div className="h-1 w-10 bg-blue-500 rounded-full mr-2"></div>
-              <span className="text-sm text-blue-500">89% MATCH</span>
-              <span className="text-xs text-gray-500 ml-auto">More info</span>
-            </div>
-            
-            {/* Image above content, with 16:10 aspect ratio */}
-            <div className="w-full mt-2 mb-4">
+            {/* Image above everything */}
+            <div className="w-full mb-4">
               <div className={`w-full aspect-[16/10] ${getFieldAnimationClass("image")}`}>
                 {isTargetFieldConnected("image") ? (
                   <img 
-                    src="/lovable-uploads/28f3486c-d672-4d5f-aad6-bbb221854306.png" 
+                    src="https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/iphone-15-pro-storage-select-202309-6-1inch-blacktitanium?wid=1280&hei=720&fmt=p-jpg&qlt=80&.v=1692854439854" 
                     alt="iPhone 15 Pro" 
                     className="w-full h-full object-contain"
                   />
@@ -488,7 +513,14 @@ const MappingArea: React.FC = () => {
               </div>
             </div>
             
-            {/* Product content below image */}
+            {/* Match percentage below image */}
+            <div className="flex items-center mb-2">
+              <div className="h-1 w-10 bg-blue-500 rounded-full mr-2"></div>
+              <span className="text-sm text-blue-500">89% MATCH</span>
+              <span className="text-xs text-gray-500 ml-auto">More info</span>
+            </div>
+            
+            {/* Product content below match percentage */}
             <div>
               <h3 className={`font-medium text-gray-800 ${getFieldAnimationClass("product-name")}`}>
                 {isTargetFieldConnected("product-name") ? (
