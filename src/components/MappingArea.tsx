@@ -79,7 +79,6 @@ const MappingArea: React.FC = () => {
   const [hoveredTargetField, setHoveredTargetField] = useState<string | null>(null);
 
   useEffect(() => {
-    // Initialize with default connections
     const initialConnections = [
       { id: "conn-1", sourceId: "sku-id", targetId: "id" },
       { id: "conn-2", sourceId: "title", targetId: "product-name" },
@@ -88,7 +87,6 @@ const MappingArea: React.FC = () => {
     
     setConnections(initialConnections);
     
-    // Initialize connected fields state
     const initialFieldsState: ConnectedFields = {};
     initialConnections.forEach(conn => {
       initialFieldsState[conn.targetId] = true;
@@ -140,7 +138,6 @@ const MappingArea: React.FC = () => {
         mouseY: e.clientY - containerRect.top,
       });
       
-      // Check if we're hovering over any target field
       let foundHoveredField = false;
       
       for (const [id, element] of Object.entries(targetFieldRefs.current)) {
@@ -151,7 +148,7 @@ const MappingArea: React.FC = () => {
           e.clientX >= rect.left &&
           e.clientX <= rect.right &&
           e.clientY >= rect.top &&
-          e.clientY >= rect.bottom;
+          e.clientY <= rect.bottom;
         
         if (isOver) {
           setHoveredTargetField(id);
@@ -211,13 +208,11 @@ const MappingArea: React.FC = () => {
     
     let targetId: string | null = null;
     
-    // First check if we're over a target field
     if (hoveredTargetField) {
       targetId = hoveredTargetField;
     } else {
-      // Fall back to checking if we're over a target dot
-      for (const [id, element] of Object.entries(targetDotsRef.current)) {
-        if (!element) continue;
+      for (const [id, element] of Object.entries(targetFieldRefs.current)) {
+        if (!element || connections.some(conn => conn.targetId === id)) continue;
         
         const rect = element.getBoundingClientRect();
         const isOver =
@@ -231,6 +226,24 @@ const MappingArea: React.FC = () => {
           break;
         }
       }
+      
+      if (!targetId) {
+        for (const [id, element] of Object.entries(targetDotsRef.current)) {
+          if (!element || connections.some(conn => conn.targetId === id)) continue;
+          
+          const rect = element.getBoundingClientRect();
+          const isOver =
+            e.clientX >= rect.left - 10 &&
+            e.clientX <= rect.right + 10 &&
+            e.clientY >= rect.top - 10 &&
+            e.clientY <= rect.bottom + 10;
+          
+          if (isOver) {
+            targetId = id;
+            break;
+          }
+        }
+      }
     }
     
     if (targetId && !connections.some(conn => conn.targetId === targetId)) {
@@ -242,7 +255,6 @@ const MappingArea: React.FC = () => {
       
       setConnections([...connections, newConnection]);
       
-      // Update connected fields state
       setConnectedFields(prev => ({
         ...prev,
         [targetId]: true
@@ -252,7 +264,6 @@ const MappingArea: React.FC = () => {
     setDrawingConnection(null);
     setHoveredTargetField(null);
     
-    // Re-enable text selection
     if (isDragging) {
       setIsDragging(false);
       document.body.style.userSelect = '';
@@ -296,7 +307,6 @@ const MappingArea: React.FC = () => {
       
       setConnections([...connections, newConnection]);
       
-      // Update connected fields state
       setConnectedFields(prev => ({
         ...prev,
         [targetId]: true
@@ -310,7 +320,6 @@ const MappingArea: React.FC = () => {
     const connectionToRemove = connections.find(conn => conn.id === connectionId);
     
     if (connectionToRemove) {
-      // Update connected fields state
       setConnectedFields(prev => ({
         ...prev,
         [connectionToRemove.targetId]: false
@@ -496,7 +505,6 @@ const MappingArea: React.FC = () => {
       <div className="w-[30%] space-y-6">
         <div className="bg-white rounded-lg border p-4">
           <div className="flex flex-col">
-            {/* Image above everything */}
             <div className="w-full mb-4">
               <div className={`w-full aspect-[16/10] ${getFieldAnimationClass("image")}`}>
                 {isTargetFieldConnected("image") ? (
@@ -513,14 +521,12 @@ const MappingArea: React.FC = () => {
               </div>
             </div>
             
-            {/* Match percentage below image */}
             <div className="flex items-center mb-2">
               <div className="h-1 w-10 bg-blue-500 rounded-full mr-2"></div>
               <span className="text-sm text-blue-500">89% MATCH</span>
               <span className="text-xs text-gray-500 ml-auto">More info</span>
             </div>
             
-            {/* Product content below match percentage */}
             <div>
               <h3 className={`font-medium text-gray-800 ${getFieldAnimationClass("product-name")}`}>
                 {isTargetFieldConnected("product-name") ? (
